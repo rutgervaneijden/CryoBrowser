@@ -33,6 +33,20 @@ class MainWindow(QMainWindow):
         for link in soup.find_all('a'):
             if link['href'].endswith('.png'):
                 self.available_charts.addItem(link['href'])
+        # https://noaadata.apps.nsidc.org/NOAA/G02135/north/daily/images/2026/01_Jan/N_20260101_conc_hires_v4.0.png
+        # https://noaadata.apps.nsidc.org/NOAA/G02135/south/daily/images/2026/01_Jan/S_20260101_conc_hires_v4.0.png
+        # https://noaadata.apps.nsidc.org/NOAA/G02135/north/daily/images/2026/01_Jan/N_20260101_extn_hires_v4.0.png
+        # https://noaadata.apps.nsidc.org/NOAA/G02135/south/daily/images/2026/01_Jan/S_20260101_extn_hires_v4.0.png
+        for url in [
+                f'https://noaadata.apps.nsidc.org/NOAA/G02135/north/daily/images/{self.calendar.selectedDate().toString('yyyy/MM_MMM')}',
+                f'https://noaadata.apps.nsidc.org/NOAA/G02135/south/daily/images/{self.calendar.selectedDate().toString('yyyy/MM_MMM')}'
+            ]:
+            response = get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            for link in soup.find_all('a'):
+                if link['href'].endswith('_conc_hires_v4.0.png') or link['href'].endswith('_extn_hires_v4.0.png'):
+                    if link['href'][2:10] == self.calendar.selectedDate().toString('yyyyMMdd'):
+                        self.available_charts.addItem(link['href'])
         self.available_charts.itemClicked.connect(self.show_chart)
     def show_chart(self):
         window_id = self.available_charts.currentItem().text()
@@ -42,7 +56,12 @@ class MainWindow(QMainWindow):
         browser.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
         if not (p / self.available_charts.currentItem().text()).exists():
             with open(p / self.available_charts.currentItem().text(), 'wb') as f:
-                f.write(get(f'https://cryo.met.no/archive/ice-service/icecharts/quicklooks/{self.calendar.selectedDate().toString('yyyy/yyyyMMdd')}/{self.available_charts.currentItem().text()}', stream=True).content)
+                if self.available_charts.currentItem().text().startswith('N_'):
+                    f.write(get(f'https://noaadata.apps.nsidc.org/NOAA/G02135/north/daily/images/{self.calendar.selectedDate().toString('yyyy/MM_MMM')}/{self.available_charts.currentItem().text()}', stream=True).content)
+                if self.available_charts.currentItem().text().startswith('S_'):
+                    f.write(get(f'https://noaadata.apps.nsidc.org/NOAA/G02135/south/daily/images/{self.calendar.selectedDate().toString('yyyy/MM_MMM')}/{self.available_charts.currentItem().text()}', stream=True).content)
+                if self.available_charts.currentItem().text().endswith('_hat.png') or self.available_charts.currentItem().text().endswith('_col.png'):
+                    f.write(get(f'https://cryo.met.no/archive/ice-service/icecharts/quicklooks/{self.calendar.selectedDate().toString('yyyy/yyyyMMdd')}/{self.available_charts.currentItem().text()}', stream=True).content)
         browser.setUrl(QUrl.fromLocalFile(p / self.available_charts.currentItem().text()))
         globals()[window_id].layout.addWidget(browser)
         globals()[window_id].show()
